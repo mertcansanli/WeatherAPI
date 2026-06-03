@@ -1,0 +1,6 @@
+requests
+pandas
+boto3
+psycopg2-binary
+apache-airflow-providers-amazon
+apache-airflow-providers-postgres
