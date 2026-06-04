@@ -67,6 +67,10 @@ x-airflow-common:
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+    AIRFLOW__METRICS__STATSD_ON: 'true'
+    AIRFLOW__METRICS__STATSD_HOST: statsd-exporter
+    AIRFLOW__METRICS__STATSD_PORT: 8125
+    AIRFLOW__METRICS__STATSD_PREFIX: airflow
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
@@ -93,6 +97,38 @@ x-airflow-common:
       condition: service_healthy
 
 services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    restart: always
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - statsd-exporter
+    restart: always
+  statsd-exporter:
+    image: prom/statsd-exporter:latest
+    container_name: statsd-exporter
+    command:
+      - "--statsd.listen-udp=:8125"
+      - "--web.listen-address=:9102"
+    ports:
+      - "9102:9102"
+      - "8125:8125/udp"
+
+    restart: always 
+
   postgres:
     image: postgres:16
     environment:
@@ -350,4 +386,4 @@ services:
 volumes:
   postgres-db-volume:
   weather-postgres-db-volume:
-
+  grafana-storage:

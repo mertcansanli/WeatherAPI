@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime
-
+from airflow.stats import Stats
 import pandas as pd
 
 from airflow.decorators import dag, task
@@ -15,6 +15,12 @@ from include.scripts.postgres_sql import load_record_to_postgres
 
 CITIES = ["Lisbon", "Istanbul", "London"]
 
+def dag_success_callback(context):
+    Stats.incr("weather_pipeline.dag_success")
+
+
+def dag_failure_callback(context):
+    Stats.incr("weather_pipeline.dag_failure")
 
 @dag(
     dag_id="weather_etl_pipeline",
@@ -23,6 +29,8 @@ CITIES = ["Lisbon", "Istanbul", "London"]
     schedule="@hourly",
     catchup=False,
     tags=["weather", "api", "s3", "postgres", "data-engineering"],
+    on_success_callback=dag_success_callback,
+    on_failure_callback=dag_failure_callback,
 )
 def weather_etl_pipeline():
 
