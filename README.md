@@ -1,150 +1,186 @@
-#Day 1 :
+# Weather Data Engineering Pipeline
 
-# Weather Airflow S3 Pipeline
+A Dockerized data engineering project built with Apache Airflow, OpenWeather API, AWS S3, AWS Glue, Amazon Athena, PostgreSQL, Prometheus, and Grafana.
 
-A beginner-friendly data engineering pipeline built with Apache Airflow, Docker, AWS S3, PostgreSQL, and OpenWeather API.
-
-The project extracts current weather data from OpenWeather API, stores raw JSON files locally, transforms nested API responses into a clean tabular format, validates data quality rules, uploads processed files to Amazon S3, and loads curated records into PostgreSQL.
-
-## Project Goal
-
-The goal of this project is to practice core data engineering concepts in a local Dockerized environment while using AWS S3 as cloud object storage.
-
-This project focuses on:
-
-* Apache Airflow DAG development
-* Docker Compose usage
-* API data extraction
-* Raw and processed data handling
-* Data transformation with Python
-* Basic data quality validation
-* AWS S3 file upload
-* PostgreSQL loading
-* Container networking and environment variables
-
-## Architecture
-
-```text
-OpenWeather API
-      ↓
-Apache Airflow DAG
-      ↓
-Extract raw weather data
-      ↓
-Save raw JSON locally
-      ↓
-Transform nested JSON into tabular records
-      ↓
-Validate required fields and value ranges
-      ↓
-Save processed CSV
-      ↓
-Upload processed file to AWS S3
-      ↓
-Load records into PostgreSQL
-```
+The pipeline extracts weather data from OpenWeather API, transforms and validates it, stores raw and processed files in S3, loads records into PostgreSQL, catalogs Parquet data with AWS Glue, runs Athena queries automatically, and monitors the pipeline with Prometheus and Grafana.
 
 ## Tech Stack
 
 * Python
 * Apache Airflow
-* Docker
 * Docker Compose
+* OpenWeather API
 * AWS S3
+* AWS Glue
+* Amazon Athena
 * PostgreSQL
 * Pandas
 * Boto3
-* Requests
-* OpenWeather API
+* Prometheus
+* Grafana
 
-## Pipeline Steps
-
-1. Extract weather data from OpenWeather API for selected cities
-2. Save raw API responses as JSON files
-3. Transform nested JSON into a flat analytical structure
-4. Validate important fields such as city, temperature, humidity, pressure, and timestamp
-5. Save the processed records as CSV
-6. Upload processed files to an AWS S3 bucket
-7. Load final records into PostgreSQL
-
-## Project Structure
+## Pipeline Flow
 
 ```text
-weatherapi/
-├── dags/
-│   └── weather_etl_dag.py
-├── include/
-│   ├── scripts/
-│   │   ├── extract_weather.py
-│   │   ├── transform_weather.py
-│   │   ├── validation_script.py
-│   │   ├── upload_s3.py
-│   │   └── postgres_sql.py
-│   └── sql/
-│       └── create_weather_table.sql
-├── data/
-│   ├── raw/
-│   └── processed/
-├── logs/
-├── plugins/
-├── docker-compose.yaml
-├── requirements.txt
-├── .env.example
-└── README.md
+OpenWeather API
+    ↓
+Airflow DAG
+    ↓
+Extract raw weather data
+    ↓
+Save raw JSON locally and upload to S3
+    ↓
+Transform nested JSON into tabular records
+    ↓
+Validate data quality rules
+    ↓
+Save processed CSV
+    ↓
+Update master CSV
+    ↓
+Upload CSV outputs to S3
+    ↓
+Save Parquet output
+    ↓
+Upload partitioned Parquet to S3
+    ↓
+Run AWS Glue Crawler
+    ↓
+Run Athena summary query
+    ↓
+Load validated records into PostgreSQL
+    ↓
+Monitor with Prometheus and Grafana
 ```
+
+## S3 Structure
+
+```text
+weather/
+├── raw/
+│   └── year=YYYY/month=MM/day=DD/hour=HH/
+├── processed/
+│   └── weather_YYYYMMDDTHHMMSS.csv
+├── master/
+│   └── weather_master.csv
+├── processed_parquet/
+│   └── year=YYYY/month=MM/day=DD/hour=HH/
+└── athena-results/
+    └── weather/
+```
+
+## Main Features
+
+* Hourly weather data extraction from OpenWeather API
+* Raw JSON storage
+* Data transformation with Python
+* Data validation before loading
+* Run-level processed CSV outputs
+* Cumulative master CSV
+* Partitioned Parquet output for analytics
+* AWS S3 data lake structure
+* AWS Glue Crawler integration
+* Automated Athena query execution
+* PostgreSQL loading
+* Prometheus and Grafana monitoring
+* Custom Airflow pipeline metrics
+
+## Data Validation
+
+The pipeline validates:
+
+* Required fields
+* Temperature range
+* Humidity between 0 and 100
+* Positive pressure values
+* Timestamp availability
+
+If validation fails, the pipeline stops before uploading processed data or loading PostgreSQL.
+
+## Monitoring
+
+The project includes Prometheus, StatsD Exporter, and Grafana.
+
+Tracked metrics include:
+
+* DAG success/failure
+* Records extracted
+* Records validated
+* Records loaded
+* Validation failures
+* S3 upload success/failure
+* Parquet upload success/failure
+* Glue crawler success/failure
+* Athena query success/failure
+* PostgreSQL load success/failure
 
 ## Environment Variables
 
-Create a `.env` file in the project root.
+Create a `.env` file:
 
 ```env
 OPENWEATHER_API_KEY=
+
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 AWS_DEFAULT_REGION=eu-west-1
 S3_BUCKET_NAME=
+
+ATHENA_DATABASE=weather_db
+ATHENA_TABLE=<your_glue_table_name>
+ATHENA_OUTPUT_LOCATION=s3://<bucket-name>/athena-results/weather/
+ATHENA_WORKGROUP=primary
+GLUE_CRAWLER_NAME=weather_processed_parquet_crawler
+
 FERNET_KEY=
-_PIP_ADDITIONAL_REQUIREMENTS=requests pandas boto3 psycopg2-binary
+
+_PIP_ADDITIONAL_REQUIREMENTS=requests pandas boto3 psycopg2-binary apache-airflow[statsd] pyarrow
 ```
 
-Do not commit the real `.env` file to GitHub.
+Do not commit the real `.env` file.
 
-## How to Run
+## Run Locally
 
-Start Airflow with Docker Compose:
+Start the services:
 
 ```bash
 docker compose up -d
 ```
 
-Open Airflow UI:
+Open Airflow:
 
 ```text
 http://localhost:8080
 ```
 
-Default credentials:
-
-```text
-username: airflow
-password: airflow
-```
-
-Trigger the DAG manually from the Airflow UI:
+Trigger the DAG:
 
 ```text
 weather_etl_pipeline
 ```
 
-## PostgreSQL Check
+Open monitoring tools:
 
-Connect to the project PostgreSQL container:
-
-```bash
-docker exec -it weather-postgres psql -U weather_user -d weather_db
+```text
+Prometheus: http://localhost:9090
+Grafana:    http://localhost:3000
 ```
 
-Query latest records:
+## Athena Example Query
+
+```sql
+SELECT
+    city,
+    COUNT(*) AS records,
+    AVG(temperature_c) AS avg_temperature_c,
+    AVG(humidity) AS avg_humidity,
+    MAX(collected_at) AS latest_collected_at
+FROM weather_db.<your_table_name>
+GROUP BY city
+ORDER BY city;
+```
+
+## PostgreSQL Check
 
 ```sql
 SELECT
@@ -157,47 +193,43 @@ FROM weather_observations
 ORDER BY collected_at DESC;
 ```
 
-## Example Data Quality Checks
+## Project Structure
 
-The pipeline validates:
-
-* city is not null
-* temperature is not null
-* humidity is between 0 and 100
-* pressure is not null
-* collected_at timestamp exists
-
-## What I Learned
-
-Through this project, I practiced:
-
-* Building an Airflow DAG from scratch
-* Running Airflow with Docker Compose
-* Debugging DAG import errors and task failures
-* Working with environment variables inside containers
-* Extracting data from an external API
-* Transforming semi-structured JSON into tabular data
-* Uploading processed files to AWS S3
-* Loading records into PostgreSQL
-* Understanding container-to-container networking
+```text
+weatherapi/
+├── dags/
+│   └── weather_etl_dag.py
+├── include/
+│   └── scripts/
+│       ├── extract_weather.py
+│       ├── transform_scripts.py
+│       ├── validation_script.py
+│       ├── upload_s3.py
+│       ├── postgres_sql.py
+│       ├── glue_crawler.py
+│       └── athena_query.py
+├── data/
+├── monitoring/
+├── docker-compose.yaml
+├── .env.example
+├── .gitignore
+└── README.md
+```
 
 ## Future Improvements
 
-Planned improvements:
-
-* Store both raw and processed data in AWS S3
-* Convert processed CSV files to Parquet
-* Add partitioned S3 paths such as year/month/day
-* Add AWS Glue Crawler and Athena for querying S3 data
-* Move PostgreSQL from Docker to AWS RDS
-* Deploy Airflow on an EC2 instance
-* Replace AWS access keys with IAM roles
-* Add CI checks with GitHub Actions
-* Add better logging and retry handling
+* Move PostgreSQL to AWS RDS
+* Deploy Airflow on EC2
+* Replace AWS keys with IAM roles
+* Add Terraform
+* Add dbt
+* Add stronger validation with Great Expectations
+* Add Grafana alert notifications
 
 ## Status
 
-Current version: Local Dockerized Airflow pipeline with AWS S3 and PostgreSQL integration.
----------------------------------------------------------------------------------------------
+Current version:
 
-Second update Status
+```text
+Dockerized Airflow weather pipeline with S3, PostgreSQL, partitioned Parquet, AWS Glue, Athena, Prometheus, and Grafana.
+```
