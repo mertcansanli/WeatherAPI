@@ -1,6 +1,6 @@
 def validate_weather(record:dict) -> None:
     required_field = [
-        "city", "temperature_c","humidity","pressure","collected_at"
+        "city", "temperature_c","humidity","pressure","collected_at","collected_hour"
     ]
 
     missin_fields= [
@@ -12,9 +12,13 @@ def validate_weather(record:dict) -> None:
 
     temperature = record["temperature_c"]
     humidity = record["humidity"]
+    pressure = record["pressure"]
 
     if temperature < -90 or temperature > 60:
         raise ValueError(f"Suspicious temperature value: {temperature}")
 
     if humidity < 0 or humidity > 100:
         raise ValueError(f"Invalid humidity value: {humidity}")
+
+    if pressure <= 0:
+        raise ValueError(f"Invalid pressure value: {pressure}")
