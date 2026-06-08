@@ -16,7 +16,14 @@ from include.scripts.postgres_sql import load_record_to_postgres
 
 from include.scripts.athena_query import run_athena_query
 from include.scripts.glue_crawler import start_glue_crawler_and_wait
-CITIES = ["Lisbon", "Istanbul", "London"]
+CITIES = ["Lisbon", "Istanbul", "London","Porto","Izmir","Berlin","Paris","Tokyo"]
+
+from include.scripts.redshift_sql import (
+    copy_parquet_from_s3_to_redshift,
+    refresh_redshift_daily_summary,
+)
+
+
 
 RAW_DIR = "/opt/airflow/data/raw"
 PROCESSED_DIR = "/opt/airflow/data/processed"
@@ -336,7 +343,35 @@ def weather_etl_pipeline():
 
         return query_execution_id
     
+    @task 
+    def load_redshift_task(parquet_s3_key:str) -> str:
+        bucket_name = os.getenv("S3_BUCKET_NAME")
+        if not bucket_name:
+            raise ValueError("Enter a valid bucket name")
+        
+        s3_path = f"s3://{bucket_name}/{parquet_s3_key}"
+        try:
+            result = copy_parquet_from_s3_to_redshift(s3_path)
+        except Exception:
+            Stats.incr("weather_pipeline.redshift_load_failure")
+            raise
 
+        Stats.incr("weather_pipeline.redshift_load_success")
+
+        return result
+    
+
+    @task
+    def refresh_redshift_summary_task() -> str:
+        try:
+         result = refresh_redshift_daily_summary()
+        except Exception:
+            Stats.incr("weather_pipeline.redshift_summary_failure")
+            raise
+
+        Stats.incr("weather_pipeline.redshift_summary_success")
+    
+        return result
 
 
     extracted_payloads = extract_task()
@@ -358,6 +393,9 @@ def weather_etl_pipeline():
     glue_crawler_result = run_glue_crawler_task()
     athena_query_id = run_athena_summary_query_task()
 
+    redshift_load_result = load_redshift_task(parquet_s3_key)
+    redshift_summary_result = refresh_redshift_summary_task()
+
     postgres_count = load_postgres_task(validated_records)
 
     raw_files >> raw_s3_keys
@@ -367,6 +405,6 @@ def weather_etl_pipeline():
     validated_records >> parquet_file >> parquet_s3_key
     validated_records >> postgres_count
     parquet_s3_key >> glue_crawler_result >> athena_query_id
-
+    #parquet_s3_key >> redshift_load_result >> redshift_summary_result
 
 weather_etl_pipeline()

@@ -71,6 +71,13 @@ x-airflow-common:
     AIRFLOW__METRICS__STATSD_HOST: statsd-exporter
     AIRFLOW__METRICS__STATSD_PORT: 8125
     AIRFLOW__METRICS__STATSD_PREFIX: airflow
+
+    REDSHIFT_HOST: ${REDSHIFT_HOST}
+    REDSHIFT_PORT: ${REDSHIFT_PORT}
+    REDSHIFT_DB: ${REDSHIFT_DB}
+    REDSHIFT_USER: ${REDSHIFT_USER}
+    REDSHIFT_PASSWORD: ${REDSHIFT_PASSWORD}
+    REDSHIFT_IAM_ROLE_ARN: ${REDSHIFT_IAM_ROLE_ARN}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
